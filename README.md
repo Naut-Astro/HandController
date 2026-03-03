@@ -70,5 +70,5 @@ DETALHES TÉCNICOS
 
 
 LICENÇA
-Este projeto é apenas para fins educacionais e de estudo.
+- Este projeto é apenas para fins educacionais e de estudo.
 Sinta-se à vontade para usar, modificar e aprender com ele.
