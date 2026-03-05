@@ -12,13 +12,19 @@ from mediapipe.tasks.python import vision
 MODEL_PATH = "hand_landmarker.task"
 
 screen_w, screen_h = pyautogui.size()
-smoothening = 3
 prev_x, prev_y = 0, 0
-prev_scroll_y = 0
 
 dragging = False
 frameskip = 2
 framecount = 0
+
+lastcommand = "Teste"
+
+#Speed control - EMA
+slow = 0.3
+fast = 0.7
+speedthreshold = 15
+deadzone = 5
 
 #Margins
 frame_margin_x = 70
@@ -97,20 +103,30 @@ while cap.isOpened():
             x = int(midfingerbase.x * w)
             y = int(midfingerbase.y * h)
 
-            screen_x = np.interp(
-            x,
+            #Screen-Margin Conversion
+            screen_x = np.interp(x,
             (frame_margin_x, w - frame_margin_x),
-            (0, screen_w)
-            )
-
-            screen_y = np.interp(
-            y,
+            (0, screen_w))
+            
+            screen_y = np.interp(y,
             (50, h - frame_margin_y),
-            (0, screen_h)
-            )
+            (0, screen_h))
 
-            curr_x = prev_x + (screen_x - prev_x) / smoothening
-            curr_y = prev_y + (screen_y - prev_y) / smoothening
+            #Movement
+            dx = screen_x - prev_x
+            dy = screen_y - prev_y
+
+            if abs(dx) < deadzone:
+                dx = 0
+            if abs(dy) < deadzone:
+                dy = 0
+
+            speed = np.hypot(dx, dy)
+
+            alpha = fast if speed > speedthreshold else slow
+
+            curr_x = prev_x + alpha * dx
+            curr_y = prev_y + alpha * dy
 
             pyautogui.moveTo(curr_x, curr_y)
             prev_x, prev_y = curr_x, curr_y
@@ -127,6 +143,7 @@ while cap.isOpened():
             if distBT < handsize * 0.45:
                 pyautogui.click()
                 pyautogui.sleep(0.25)
+                lastcommand = "Clique"
 
             #IndexTip-Thumb Distance (Drag)
             distTT = calcdist(indfingertip, thumb, w, h)
@@ -134,8 +151,9 @@ while cap.isOpened():
             if distTT < handsize * 0.45 and not dragging:
                 pyautogui.mouseDown()
                 dragging = True
+                lastcommand = "Segurar/Arrastar"
 
-            if distTT > handsize * 0.55 and dragging:
+            if distTT > handsize * 0.65 and dragging:
                 pyautogui.mouseUp()
                 dragging = False
 
@@ -143,9 +161,9 @@ while cap.isOpened():
             distIM = calcdist(indfingertip, midfingertip, w, h)
 
             if distIM < handsize * 0.35:
-                scroll_amount = int((prev_scroll_y - curr_y) * 2)
+                scroll_amount = int(dy * 1.85)
                 pyautogui.scroll(scroll_amount)
-                prev_scroll_y = curr_y
+                lastcommand = "Rolagem"
 
             #Draw Points
             for landmark in hand:
@@ -160,13 +178,16 @@ while cap.isOpened():
                     cx, cy = int(landmark.x * w), int(landmark.y * h)
                     cv2.circle(frame, (cx, cy), 5, (225, 225, 225), -1)
 
-        cv2.rectangle(
-        frame,
-        (frame_margin_x, 50),
-        (w - frame_margin_x, h - frame_margin_y),
-        (0, 127, 255),
-        4
-        )
+
+        #Show Margin
+        cv2.rectangle(frame,(frame_margin_x, 50),
+                    (w - frame_margin_x, h - frame_margin_y),
+                    (0, 127, 255),4)
+
+        #Show Info
+        cv2.putText(frame, "Ultimo comando: " + lastcommand,
+                    (10, h-10), cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (0,0,0), 3)
     
         cv2.imshow("Hand-Controlled Cursor", frame)
 
