@@ -2,9 +2,11 @@ import cv2
 import numpy as np
 import pyautogui
 import mediapipe as mp
+import math
 
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+
 
 #CONFIG
 MODEL_PATH = "hand_landmarker.task"
@@ -12,14 +14,15 @@ MODEL_PATH = "hand_landmarker.task"
 screen_w, screen_h = pyautogui.size()
 smoothening = 3
 prev_x, prev_y = 0, 0
+prev_scroll_y = 0
 
 dragging = False
 frameskip = 2
 framecount = 0
 
 #Margins
-frame_margin_x = 100
-frame_margin_y = 180
+frame_margin_x = 70
+frame_margin_y = 110
 
 #MediaPipe HandLandmarker
 BaseOptions = python.BaseOptions
@@ -45,6 +48,13 @@ timestamp = 0
 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+
+
+#FUNCTIONS
+def calcdist(p1, p2, w, h):
+    x1, y1 = int(p1.x * w), int(p1.y * h)
+    x2, y2 = int(p2.x * w), int(p2.y * h)
+    return math.hypot(x2 - x1, y2 - y1)
 
 
 #LOOP
@@ -76,6 +86,12 @@ while cap.isOpened():
         if result.hand_landmarks:
             hand = result.hand_landmarks[0]
 
+            # Hand Width (Scale Reference)
+            indexroot = hand[5]
+            pinkyroot = hand[17]
+
+            handsize = calcdist(indexroot, pinkyroot, w, h)
+
             #Middle Finger Base (Position Reference)
             midfingerbase = hand[9]
             x = int(midfingerbase.x * w)
@@ -99,43 +115,43 @@ while cap.isOpened():
             pyautogui.moveTo(curr_x, curr_y)
             prev_x, prev_y = curr_x, curr_y
 
-            #Index Finger Base
-            indfingerbase = hand[6]
-            ix = int(indfingerbase.x * w)
-            iy = int(indfingerbase.y * h)
-
-            #Index Finger Tip
-            indfingertip = hand[8]
-            itx = int(indfingertip.x * w)
-            ity = int(indfingertip.y * h)
-        
-            #Thumb
+            #Finger point references
             thumb = hand[4]
-            tx = int(thumb.x * w)
-            ty = int(thumb.y * h)
+            indfingerbase = hand[6]
+            indfingertip = hand[8]
+            midfingertip = hand[12]
 
-            #IndexBase-Thumb Distance
-            distBT = np.hypot(ix - tx, iy - ty)
+            #IndexBase-Thumb Distance (Click)
+            distBT = calcdist(indfingerbase, thumb, w, h)
 
-            if distBT < 30:
+            if distBT < handsize * 0.45:
                 pyautogui.click()
-                pyautogui.sleep(0.35)
+                pyautogui.sleep(0.25)
 
-            #IndexTip-Thumb Distance
-            distTT = np.hypot(itx - tx, ity - ty)
+            #IndexTip-Thumb Distance (Drag)
+            distTT = calcdist(indfingertip, thumb, w, h)
 
-            if distTT < 30 and not dragging:
+            if distTT < handsize * 0.45 and not dragging:
                 pyautogui.mouseDown()
                 dragging = True
 
-            if distTT > 50 and dragging:
+            if distTT > handsize * 0.55 and dragging:
                 pyautogui.mouseUp()
                 dragging = False
+
+            #IndexTip-MiddleTip (Scroll)
+            distIM = calcdist(indfingertip, midfingertip, w, h)
+
+            if distIM < handsize * 0.35:
+                scroll_amount = int((prev_scroll_y - curr_y) * 2)
+                pyautogui.scroll(scroll_amount)
+                prev_scroll_y = curr_y
 
             #Draw Points
             for landmark in hand:
                 if(landmark == hand[6] or
                 landmark == hand[8] or
+                landmark == hand[12] or
                 landmark == hand[4]):
                     cx, cy = int(landmark.x * w), int(landmark.y * h)
                     cv2.circle(frame, (cx, cy), 4, (0, 127, 255), -1)
