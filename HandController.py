@@ -50,6 +50,7 @@ landmarker = HandLandmarker.create_from_options(opt)
 
 #Webcam
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 timestamp = 0
 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
@@ -71,7 +72,7 @@ while cap.isOpened():
 
     framecount += 1
 
-    if framecount % frameskip != 0:
+    if framecount % frameskip == 0:
 
         #Flip Camera
         frame = cv2.flip(frame, 1)
@@ -128,8 +129,9 @@ while cap.isOpened():
             curr_x = prev_x + alpha * dx
             curr_y = prev_y + alpha * dy
 
-            pyautogui.moveTo(curr_x, curr_y)
-            prev_x, prev_y = curr_x, curr_y
+            if abs(curr_x - prev_x) > 2 or abs(curr_y - prev_y) > 2:
+                pyautogui.moveTo(curr_x, curr_y)
+                prev_x, prev_y = curr_x, curr_y
 
             #Finger point references
             thumb = hand[4]
