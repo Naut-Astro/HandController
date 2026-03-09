@@ -42,9 +42,9 @@ REQUISITOS
 - Python 3.10
 - Webcam funcional
 - Sistema operacional:
-    Windows
-    Linux
-    macOS
+    * Windows
+    * Linux
+    * macOS
 
 
 INSTALAÇÃO
